@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"runtime"
 	"sync/atomic"
@@ -32,30 +31,26 @@ func bruteForceRoutine(ethAddress []byte, doneCh chan bool) {
 			panic(err)
 		}
 		address := getAddressForPrivateKey(privateKey)
-		if bytes.Compare(address.Bytes(), ethAddress) == 0 {
+		if bytes.Equal(address.Bytes(), ethAddress) {
 			privateKeyBytes := crypto.FromECDSA(privateKey)
 			fmt.Printf("Private key found: %s\n", hexutil.Encode(privateKeyBytes))
-			if err := ioutil.WriteFile("private_key", privateKeyBytes, 0644); err != nil {
+			if err := os.WriteFile("private_key", privateKeyBytes, 0644); err != nil {
 				panic(err)
 			}
 			doneCh <- true
 		}
 		atomic.AddUint64(&iterations, 1)
-		time.Sleep(time.Millisecond)
 	}
 }
 
 func iterationsWatcher() {
 	var prevIterations uint64
 	oneSecondTimer := time.NewTimer(time.Second)
-	for {
-		select {
-		case <-oneSecondTimer.C:
-			currentIterations := atomic.LoadUint64(&iterations)
-			fmt.Printf("Speed: %d iterations per second\n", currentIterations-prevIterations)
-			prevIterations = currentIterations
-			oneSecondTimer.Reset(time.Second)
-		}
+	for range oneSecondTimer.C {
+		currentIterations := atomic.LoadUint64(&iterations)
+		fmt.Printf("Speed: %d iterations per second\n", currentIterations-prevIterations)
+		prevIterations = currentIterations
+		oneSecondTimer.Reset(time.Second)
 	}
 }
 
